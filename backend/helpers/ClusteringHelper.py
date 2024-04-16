@@ -15,6 +15,8 @@ from fcmeans import FCM
 from helpers import DeconHelper, StringDefinitionsHelper
 from helpers.Errors import InvalidClusteringMethodError
 
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+
 DEFAULT_METHOD = StringDefinitionsHelper.K_MEANS_LABEL
 DEFAULT_DETAILS = {"num_clusters": "3", "random_state": "0"}
 
@@ -36,6 +38,7 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
     """
 
     altered_df = data_df
+    scores = None
 
     if additional_outlier_clusters:
         # If we want to make the outliers their own clusters then we first separate them from the main set
@@ -75,21 +78,21 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
         # Agglomerative Clustering
         num_clusters = int(clustering_details[StringDefinitionsHelper.NUM_CLUSTERS_LABEL])
         linkage = clustering_details[StringDefinitionsHelper.LINKAGE_LABEL]
-        clustered_df = perform_agglomerative(data_df=altered_df, num_clusters=num_clusters, linkage=linkage)
+        clustered_df, scores = perform_agglomerative(data_df=altered_df, num_clusters=num_clusters, linkage=linkage)
 
     elif clustering_method == StringDefinitionsHelper.BIRCH_LABEL:
         # Birch Clustering
         num_clusters = int(clustering_details[StringDefinitionsHelper.NUM_CLUSTERS_LABEL])
         threshold=float(clustering_details["threshold"])
         branching_factor=int(clustering_details["branching_factor"])
-        clustered_df = perform_birch(data_df=altered_df, num_clusters=num_clusters,threshold=threshold,branching_factor=branching_factor)
+        clustered_df, scores = perform_birch(data_df=altered_df, num_clusters=num_clusters,threshold=threshold,branching_factor=branching_factor)
 
     elif clustering_method == StringDefinitionsHelper.DBSCAN_LABEL:
         # DBSCAN Clustering
         eps = float(clustering_details[StringDefinitionsHelper.EPS_LABEL])
         min_samples = int(clustering_details[StringDefinitionsHelper.MIN_SAMPLES_LABEL])
         algorithm = clustering_details[StringDefinitionsHelper.ALGORITHM_LABEL]
-        clustered_df = perform_dbscan(data_df=altered_df, eps=eps, min_samples=min_samples, algorithm=algorithm)
+        clustered_df, scores = perform_dbscan(data_df=altered_df, eps=eps, min_samples=min_samples, algorithm=algorithm)
 
     elif clustering_method == StringDefinitionsHelper.DECONVOLUTION_LABEL:
         
@@ -105,7 +108,7 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
         # K Means Clustering
         num_clusters = int(clustering_details[StringDefinitionsHelper.NUM_CLUSTERS_LABEL])
         random_state = int(clustering_details[StringDefinitionsHelper.RANDOM_STATE_LABEL])
-        clustered_df = perform_k_means(data_df=altered_df, num_clusters=num_clusters, random_state=random_state)
+        clustered_df, scores = perform_k_means(data_df=altered_df, num_clusters=num_clusters, random_state=random_state)
 
     elif clustering_method == StringDefinitionsHelper.K_MEDOIDS_LABEL:
         # K Medoids Clustering
@@ -182,7 +185,8 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
 
     # Get new DataFrame with ordered clusters
     new_df = order_clusters(data_df=data_df, clustered_data_df=clustered_df)
-    return new_df
+
+    return new_df, scores
 
 
 def perform_agglomerative(data_df, num_clusters=3, linkage="ward"):
@@ -200,9 +204,10 @@ def perform_agglomerative(data_df, num_clusters=3, linkage="ward"):
     """
 
     agglomerative = AgglomerativeClustering(n_clusters=num_clusters, linkage=linkage).fit(data_df)
-
     agglomerative_results = agglomerative.labels_
-    return transform_to_df(agglomerative_results)
+    scores = calculate_score(data_df=data_df, results=agglomerative_results)
+
+    return transform_to_df(agglomerative_results), scores
 
 
 def perform_birch(data_df,threshold,branching_factor,num_clusters=3):
@@ -218,8 +223,11 @@ def perform_birch(data_df,threshold,branching_factor,num_clusters=3):
     """
 
     birch = Birch(n_clusters=num_clusters, threshold=threshold,branching_factor=branching_factor).fit(data_df)
+    
     birch_results = birch.labels_
-    return transform_to_df(birch_results)
+    scores = calculate_score(data_df=data_df, results=birch_results)
+
+    return transform_to_df(birch_results), scores
 
 
 def perform_dbscan(data_df, eps=0.75, min_samples=100, algorithm="auto"):
@@ -244,7 +252,9 @@ def perform_dbscan(data_df, eps=0.75, min_samples=100, algorithm="auto"):
 
     dbscan = DBSCAN(algorithm=algorithm, eps=eps, min_samples=min_samples).fit(data_df)
     dbscan_results = dbscan.labels_
-    return transform_to_df(dbscan_results)
+    scores = calculate_score(data_df=data_df, results=dbscan_results)
+    
+    return transform_to_df(dbscan_results), scores
 
 
 def perform_decon(data_df, m_val=3, max_iter=1500, limit=10 ** -6, label="Hardness", show_plots=False,
@@ -316,12 +326,18 @@ def perform_k_means(data_df, num_clusters=3, random_state=0):
     Performs K Means clustering
 
     """
-
+    
     k_means = KMeans(n_clusters=num_clusters, random_state=random_state).fit(data_df)
     
     k_means_results = k_means.predict(data_df)
 
-    return transform_to_df(k_means_results)
+    # silhouette = silhouette_score(data_df, k_means_results)
+    # davies_bouldin = davies_bouldin_score(data_df, k_means_results)
+    # calinski_harabasz = calinski_harabasz_score(data_df, k_means_results)
+
+    scores = calculate_score(data_df=data_df, results=k_means_results)
+
+    return transform_to_df(k_means_results), scores
 
 
 def perform_k_medoids(data_df, num_clusters=3, init="random", random_state=0):
@@ -516,3 +532,11 @@ def order_clusters(data_df, clustered_data_df):
     df_new = pd.DataFrame({"Data": original_data_values["Cluster"].map(transformation_dictionary)})
 
     return df_new
+
+#Function to calculate scores
+def calculate_score(data_df, results):
+    silhouette = silhouette_score(data_df, results)
+    davies_bouldin = davies_bouldin_score(data_df, results)
+    calinski_harabasz = calinski_harabasz_score(data_df, results)
+
+    return [silhouette, davies_bouldin, calinski_harabasz]

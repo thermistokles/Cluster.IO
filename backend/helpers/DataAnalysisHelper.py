@@ -98,6 +98,9 @@ def plot_raw_data(data_df, x_df, y_df, prop):
         z_values = np.rot90(data_df["Data"].values.reshape(grid_size_x, grid_size_y))
 
         fig, ax = plt.subplots(figsize=(6, 6))
+        fig.set_facecolor('#282828')
+        ax.tick_params(axis='x', colors='#adafa2')
+        ax.tick_params(axis='y', colors='#adafa2')
 
         ax.set_aspect('equal')
         # Plots contour plot
@@ -105,10 +108,10 @@ def plot_raw_data(data_df, x_df, y_df, prop):
 
         cb = fig.colorbar(cf, ax=ax)
         # Labels being set
-        cb.set_label("Raw " + str(prop) + " Values (GPA)")
-        plt.title(str(prop) + " Raw Data VS Coordinate")
-        plt.xlabel("X Values (um)")
-        plt.ylabel("Y Values (um)")
+        cb.set_label("Raw " + str(prop) + " Values (GPA)", color='#adafa2')
+        plt.title(str(prop) + " Raw Data VS Coordinate", color='#adafa2')
+        plt.xlabel("X Values (um)", color='#adafa2')
+        plt.ylabel("Y Values (um)", color='#adafa2')
         plt.savefig('../temp_image/raw_data.png')
         #plt.show()
         plt.close()
@@ -121,6 +124,8 @@ def plot_raw_data(data_df, x_df, y_df, prop):
 
         # Create a figure and axis object
         fig, ax = plt.subplots(figsize=(6, 6))
+        ax.tick_params(axis='x', colors='#adafa2')
+        ax.tick_params(axis='y', colors='#adafa2')
 
         # Set the aspect ratio of the plot
         ax.set_aspect('equal')
@@ -141,8 +146,8 @@ def plot_raw_data(data_df, x_df, y_df, prop):
 
         # Set the title and axis labels for the plot
         plt.title("Hardness and Modulus Raw Data VS Coordinate")
-        plt.xlabel("X Values (um)")
-        plt.ylabel("Y Values (um)")
+        plt.xlabel("X Values (um)", color='#adafa2')
+        plt.ylabel("Y Values (um)", color='#adafa2')
 
         # Save the plot to a file and display it
         plt.savefig('../temp_image/raw_data.png')
@@ -180,6 +185,7 @@ def plot_clustered_data(x_df, y_df, clustered_data, prop, cluster_name, cluster_
     z_values = np.rot90(clustered_data["Data"].values.reshape(grid_size_x, grid_size_y))
 
     fig, ax = plt.subplots(figsize=(6, 6))
+    fig.set_facecolor('#282828')
 
     ax.set_aspect('equal')
     # Plots contour plot
@@ -190,9 +196,9 @@ def plot_clustered_data(x_df, y_df, clustered_data, prop, cluster_name, cluster_
     cb = fig.colorbar(cf, ax=ax)
     # Labels being set
     cb.set_label("Phase")
-    plt.title(str(prop) + " Clustered VS X, Y" )
-    plt.xlabel("X Values (um)")
-    plt.ylabel("Y Values (um)")
+    plt.title(str(prop) + " Clustered VS X, Y", color='#adafa2' )
+    plt.xlabel("X Values (um)", color='#adafa2')
+    plt.ylabel("Y Values (um)", color='#adafa2')
 
     if save_clustered_contour:
         plt.savefig(clusters_save_dir + "/clustered_data_" + str(cluster_iter) + "_" + str(cluster_name))
@@ -236,14 +242,15 @@ def plot_clusters_fractions(cluster_results, prop, show_bar=False, save_cluster_
         fraction = float(res_list.count(i)) / float(len(res_list))
         cluster_fractions.append(fraction)
         cluster_num.append(i + 1)
+    plt.figure(figsize=(6, 6)).set_facecolor('#282828')
     plt.bar(cluster_num, height=cluster_fractions, width=0.4)
 
     # TODO I would like to revisit how we are making this bar graph, I don't like the width being a set amount
     # TODO I would also like to see if it is possible to make the bar graph only use integer values for it's x values
 
-    plt.title("Distribution of " + str(prop) + " Data After Clustering into " + str(len(cluster_num)) + " Clusters")
-    plt.xlabel("Cluster (" + str(len(cluster_num)) + " Clusters)")
-    plt.ylabel("Percentage of Data Contained Within Cluster")
+    plt.title("Distribution of " + str(prop) + " Data After Clustering into " + str(len(cluster_num)) + " Clusters", color='#adafa2')
+    plt.xlabel("Cluster (" + str(len(cluster_num)) + " Clusters)", color='#adafa2')
+    plt.ylabel("Percentage of Data Contained Within Cluster", color='#adafa2')
 
     if save_cluster_histograms:
         plt.savefig(cluster_histogram_dir + "/clustered_data_" + str(cluster_iter) + "_" + str(cluster_name))

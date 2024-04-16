@@ -54,10 +54,11 @@ async def execute(clustering_method, clustering_details, file_name, file_format,
     # TODO Specify different parameters to be used, clustering details need dictionary
     # TODO Fix project name in auto docs and readme
     # Read in data
-    for queue in queues:
-        await queue.put("READING")
-    await asyncio.sleep(WAIT_TIME)
+    # for queue in queues:
+    #     await queue.put("READING")
+    # await asyncio.sleep(WAIT_TIME)
     print("Reading Data...")
+    #clustered_column = 'Vertical Line X Position'
     data_df, x_df, y_df = DataCollectionHelper.get_data(file_name, file_format, clustered_column)
     print("Done Reading Data")
     # Pre process the data
@@ -72,7 +73,7 @@ async def execute(clustering_method, clustering_details, file_name, file_format,
         await queue.put("CLUSTERING")
     await asyncio.sleep(WAIT_TIME)
     print("Clustering Data... ")
-    clustered_data = ClusteringHelper.perform_clustering(data_df=data_df,
+    clustered_data, scores = ClusteringHelper.perform_clustering(data_df=data_df,
                                                          clustering_method=clustering_method,
                                                          clustering_details=clustering_details,
                                                          label=clustered_column)
@@ -90,4 +91,4 @@ async def execute(clustering_method, clustering_details, file_name, file_format,
         await queue.put("COMPLETE")
         print(queue)
     print("Process complete")
-    return
+    return scores

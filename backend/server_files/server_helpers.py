@@ -8,19 +8,21 @@ async def cluster_helper(method, clustering_details,file_name,clusterDataOn):
     :param clustering_details: the parameters for the clustering method
     :return: A response results and/or errors
     """
+    scores = []
     try:
-        await MainCallable.execute(method, clustering_details, file_name, StringDefinitionsHelper.FILE_FORMAT_TWO,
+        scores = await MainCallable.execute(method, clustering_details, file_name, StringDefinitionsHelper.FILE_FORMAT_TWO,
                                    clustered_column=clusterDataOn)
     except Exception as e:
+        print("e: ", e)
         error = e.args
         response = createResponse(e, "","","")
-        return response
+        return response, scores
     else:
         rawData = ""
         clusteredData = ""
         clustersFractions = ""
         response = createResponse("", rawData, clusteredData, clustersFractions)
-        return response
+        return response, scores
 
 
 def createResponse(error, rawData, clusteredData,clustersFractions ):

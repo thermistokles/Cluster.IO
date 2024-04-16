@@ -73,13 +73,6 @@ def clear_temp():
                 os.remove(file_path)
 
 def populate_response_with_image_url(response):
-    
-    # with open("../temp_image/raw_data.png", "rb") as f:
-    #         response["rawData"]=upload_to_s3(f,"temp_image/raw_data.png")
-    # with open("../temp_image/clustered_data.png", "rb") as f:
-    #         response["clusteredData"]=upload_to_s3(f,"temp_image/clustered_data.png")
-    # with open("../temp_image/clusters_fractions.png", "rb") as f:
-    #         response["clustersFractions"]=upload_to_s3(f,"temp_image/clusters_fractions.png")
     with open("../temp_image/raw_data.png", "rb") as image_file:
         response["rawData"]= base64.b64encode(image_file.read()).decode("utf-8")
 
@@ -202,6 +195,7 @@ async def resolve_uploadDataset(_,info,name, file, description, project="Default
     print(name)
     print(file)
     print(project)
+    
     # Create the directory for the database if it does not exist
     database_path = os.path.join(os.getcwd(), 'Database')
     if not os.path.exists(database_path):
@@ -218,17 +212,24 @@ async def resolve_uploadDataset(_,info,name, file, description, project="Default
         os.makedirs(dataset_path)
 
     # Save the file to the dataset directory
-    file_path = os.path.join(dataset_path, file.filename)
-    with open(file_path, 'wb') as f:
-        f.write(await file.read())
+    #file_path = os.path.join(dataset_path, file.filename)
+    file_path = os.path.join(dataset_path, name)
+    #with open(file_path, 'wb') as f:
+        #f.write(await file.read())
+    
+    data = file.encode("utf8").split(b";base64,")[1]
+    with open(os.path.join(file_path), "wb") as fp:
+        fp.write(base64.decodebytes(data))
 
     # Create the URL for the file
-    url = os.path.normpath(os.path.join('Database', 'Projects', project, 'Datasets', name, file.filename))
+    #url = os.path.normpath(os.path.join('Database', 'Projects', project, 'Datasets', name, file.filename))
+    url = os.path.normpath(os.path.join('Database', 'Projects', project, 'Datasets', name, name))
 
     # Add the dataset information to the datasets dictionary
     data={
         "name":name,
-        "fileName": file.filename,
+        #"fileName": file.filename,
+        "fileName": name,
         "description":description,
         "url":url
     }
@@ -243,7 +244,6 @@ async def resolve_uploadDataset(_,info,name, file, description, project="Default
                 if (file["name"]==name):
                     return file 
                 
-
 
 
 # @mutation.field("uploadConfig")
@@ -495,10 +495,10 @@ async def resolve_kMeans_cluster(_, info, num_clusters, random_state, dataset_na
     
     #file_name=download_from_s3(url,'../temp_dataset/')
     file_name=getDatasetURL(dataset_name,project)
-    response = await cluster_helper(
+    response, scores = await cluster_helper(
         StringDefinitionsHelper.K_MEANS_LABEL, clustering_details, file_name,cluster_data_on
     )
-    return populate_response_with_image_url(response)
+    return populate_response_with_image_url(response), scores
 
 
 birch = ObjectType(StringDefinitionsHelper.BIRCH_LABEL)
@@ -518,10 +518,10 @@ async def resolve_birch_cluster(_, info, num_clusters,threshold,branching_factor
     
     # file_name=download_from_s3(url,'../temp_dataset/')
     file_name=getDatasetURL(dataset_name,project)
-    response = await cluster_helper(
+    response, scores = await cluster_helper(
         StringDefinitionsHelper.BIRCH_LABEL, clustering_details, file_name, cluster_data_on
     )
-    return populate_response_with_image_url(response)
+    return populate_response_with_image_url(response), scores
 
 
 agglomerative = ObjectType(StringDefinitionsHelper.AGGLOMERATIVE_LABEL)
@@ -542,10 +542,10 @@ async def resolve_agglomerative_cluster(_, info, num_clusters, linkage, dataset_
     
     # file_name=download_from_s3(url,'../temp_dataset/')
     file_name=getDatasetURL(dataset_name,project)
-    response = await cluster_helper(
+    response, scores = await cluster_helper(
         StringDefinitionsHelper.AGGLOMERATIVE_LABEL, clustering_details, file_name, cluster_data_on
     )
-    return populate_response_with_image_url(response)
+    return populate_response_with_image_url(response), scores
 
 
 dbscan = ObjectType(StringDefinitionsHelper.DBSCAN_LABEL)
@@ -571,10 +571,10 @@ async def resolve_dbscan_cluster(_, info, eps, min_samples, algorithm, dataset_n
     
     # file_name=download_from_s3(url,'../temp_dataset/')
     file_name=getDatasetURL(dataset_name,project)
-    response = await cluster_helper(
+    response, scores = await cluster_helper(
         StringDefinitionsHelper.DBSCAN_LABEL, clustering_details, file_name, cluster_data_on
     )
-    return populate_response_with_image_url(response)
+    return populate_response_with_image_url(response), scores
 
 
 deconvolution = ObjectType(StringDefinitionsHelper.DECONVOLUTION_LABEL)
@@ -710,7 +710,6 @@ async def resolve_gaussianmixturemodel_cluster(_, info, num_clusters,dataset_nam
     :param algorithm: A parameter taken by the clustering method
     :return: A response with the results and/or errors
     """
-    print("hello")
     clustering_details = {
         "num_clusters": int(num_clusters)
     }
