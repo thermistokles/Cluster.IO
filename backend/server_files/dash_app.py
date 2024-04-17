@@ -1,5 +1,6 @@
 
 #Dash related imports
+import os
 import base64
 from dash import Dash, Output, Input, State, MATCH
 from dash import html
@@ -23,6 +24,7 @@ app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG, dbc.icons.BOOTSTRA
 
 datasets = list(resolve_Datasets(None, None, "Project_3"))
 previous_results = []
+previous_images = {}
 
 #This is the initial layout of the application
 app.layout = dbc.Container(
@@ -233,6 +235,7 @@ def uploadFile(filename, contents):
 
 def update_algorithm_inputs(selected_algorithm):
     #The parameters are initially hidden. They will be displayed when the user inputs an algorithm
+    #Would be more efficient if we change this to pattern matching callbacks
     num_clusters_style = {'display': 'none'}
     random_state_style = {'display': 'none'}
     threshold_style = {'display': 'none'}
@@ -308,23 +311,18 @@ def update_output(n_clicks, num_clusters, random_state, threshold, branching_fac
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
-        result = loop.run_until_complete(async_update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, project, dataset, algorithm, cluster_data_on))
-
+        result = loop.run_until_complete(async_update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, project, dataset, algorithm, cluster_data_on, lock_results))
         loop.close()
 
-        if lock_results:
-            previous_results.insert(0, result)
-
-            return previous_results
-
         previous_results.insert(0, result)
-        return result
+
+        return previous_results if lock_results else result
 
     return ""
 
     
 #Perform clustering according to the inputs
-async def async_update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, project, dataset, algorithm, cluster_data_on):
+async def async_update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, project, dataset, algorithm, cluster_data_on, lock_results):
 
     #Get images based on input algorithm and parameters
     if algorithm == 'K Means':
@@ -353,7 +351,7 @@ async def async_update_output(n_clicks, num_clusters, random_state, threshold, b
     downloadIcon = html.I(className='bi bi-download', style=dict(display='inline-block', ))
     
     #Return dynamically generated output using with custom IDs for pattern matching
-    return dbc.Card([
+    result = dbc.Card([
         dbc.Row(
             [
                 html.Br(),
@@ -394,41 +392,62 @@ async def async_update_output(n_clicks, num_clusters, random_state, threshold, b
         'index' : n_clicks
     })
 
+    #Add images to hashmap for download functionality
+    previous_images[n_clicks] = [raw_data_image, clustered_data_image, clusters_fractions_image]
+
+    return result
+
 #Close card functionality based on pattern matching
 @app.callback(
         Output({'type': 'output_card', 'index': MATCH}, 'children'),
-        Input({'type': 'close_button', 'index': MATCH}, 'n_clicks')
+        Input({'type': 'close_button', 'index': MATCH}, 'n_clicks'),
+        State({'type': 'output_card', 'index': MATCH}, 'id')
 )
-def close_card(n_clicks):
+def close_card(n_clicks, card_id):
+    card_index = card_id['index']
     if n_clicks:
+        #Remove cards from previous results array.
+        #Out of bounds condition handled here
+        if card_index > len(previous_results):
+            previous_results.pop(0)
+        else:
+            previous_results.pop(-card_index)
+        del previous_images[card_index]
         return ''
     raise PreventUpdate
 
 #Download images functionality based on pattern matching
 @app.callback(
         Output({'type': 'download-image', 'index': MATCH}, 'data'),
-        Input({'type': 'download_button', 'index': MATCH}, 'n_clicks')
+        Input({'type': 'download_button', 'index': MATCH}, 'n_clicks'),
+        State({'type': 'output_card', 'index': MATCH}, 'id')
 )
-def download_images(n_clicks):
+def download_images(n_clicks, card_id):
+    card_index = card_id['index']
+
     if n_clicks:
-        path = '../temp_image/'
+        #path = '../temp_image/'
+
+        #return
+
+        images_to_download = previous_images[card_index]
 
         compression = zipfile.ZIP_DEFLATED
         # create the zip file first parameter path/name, second mode
         #Need to change this to get values from previous results array
-        zf = zipfile.ZipFile("RAWs.zip", mode="w")
-        
-        onlyfiles = [f for f in listdir(path) if isfile(join(path, f))]
+        zf = zipfile.ZipFile(str(card_index) + '.zip', mode="w")
 
         try:
-            for file_name in onlyfiles:
-                zf.write(path + file_name, file_name, compress_type=compression)
+            for i, image_data in enumerate(images_to_download):
+                image_binary = base64.b64decode(image_data)
+
+                zf.writestr(f"image_{i+1}.png", image_binary)
         except FileNotFoundError:
-            print("An error occurred")
+            print("An error occurred while zipping the files")
         finally:
             zf.close()
 
-        return dcc.send_file('RAWs.zip')
+        return dcc.send_file(str(card_index) + '.zip')
     raise PreventUpdate
 
 
