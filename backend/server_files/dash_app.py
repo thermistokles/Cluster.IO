@@ -13,6 +13,7 @@ import asyncio
 import random
 import string
 import zipfile
+import pandas as pd
 
 from os import listdir
 from os.path import isfile, join
@@ -20,11 +21,59 @@ from os.path import isfile, join
 from server import resolve_kMeans_cluster, resolve_birch_cluster, resolve_agglomerative_cluster, resolve_dbscan_cluster, resolve_Datasets, resolve_uploadDataset
 
 #Dash application
-app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG, dbc.icons.BOOTSTRAP, "dash_app.css"])
+app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG, dbc.icons.BOOTSTRAP, "dash_app.css", dbc.icons.BOOTSTRAP])
 
+#Initialize datasets
 datasets = list(resolve_Datasets(None, None, "Project_3"))
+
+#Datasets radio buttons
+def create_radio_button(value):
+    radioitem = html.Div(
+        [
+            dbc.RadioItems(
+                options=[
+                    {"value": value},
+                ],
+                id="radioitems-" + value,
+            ),
+        ]
+    )
+
+    return radioitem
+
+#Datasets delete button
+def create_delete_button(index):
+    delete_icon = html.I(className="bi bi-trash")
+
+    return dbc.Button(
+        delete_icon, color="danger",
+        className="me-1",
+        # id={
+        #     'type' : 'delete_button',
+        #     'index' : index
+        # }
+    )
+
+#Delete dataset functionality based on pattern matching
+# @app.callback(
+#     Output({'type': 'my-delete-button-output', 'index': MATCH}, 'children'),
+#     Input({'type': 'delete_button', 'index': MATCH}, 'index'),
+# )
+# def delete_dataset(index):
+#     if index:
+#         print("dataset_name: ", index)
+#         return ''
+#     raise PreventUpdate
+
+df = pd.DataFrame(
+    {'select' : [create_radio_button(dataset['name']) for dataset in datasets],
+    'Dataset' : [dataset['name'] for dataset in datasets],
+    'Delete' : [create_delete_button(index) for index in range(len(datasets))]}
+)
+
 previous_results = []
 previous_images = {}
+cluster_details = {}
 
 #This is the initial layout of the application
 app.layout = dbc.Container(
@@ -74,6 +123,8 @@ app.layout = dbc.Container(
                                 options=[{'label': dataset['name'], 'value': dataset['name']} for dataset in datasets],
                                 style={'width': '100%'}
                             ),
+                            dbc.Table.from_dataframe(df, bordered=True, striped=True),
+                            html.Div(id='my-delete-button-output'),
                             html.Br(),
                             daq.BooleanSwitch(
                                 id='my-toggle-switch',
@@ -394,6 +445,17 @@ async def async_update_output(n_clicks, num_clusters, random_state, threshold, b
 
     #Add images to hashmap for download functionality
     previous_images[n_clicks] = [raw_data_image, clustered_data_image, clusters_fractions_image]
+    cluster_details[n_clicks] = {
+        'Algorithm' : algorithm,
+        'Number of clusters' : num_clusters,
+        'random_state' : random_state,
+        'threshold' : threshold,
+        'branching_factor' : branching_factor,
+        'linkage' : linkage,
+        'eps' : eps,
+        'min_samples' : min_samples,
+        'dbs_algorithm' : dbs_algorithm
+    }
 
     return result
 
@@ -437,11 +499,21 @@ def download_images(n_clicks, card_id):
         #Need to change this to get values from previous results array
         zf = zipfile.ZipFile(str(card_index) + '.zip', mode="w")
 
+        file_path = 'parameters.txt'
+
+        # Open the file in write mode
+        with open(file_path, 'w') as f:
+            # Iterate over the dictionary items and write them to the file
+            for key, value in cluster_details[n_clicks].items():
+                if cluster_details[n_clicks][key]:
+                    f.write(f'{key}: {value}\n')
+
         try:
             for i, image_data in enumerate(images_to_download):
                 image_binary = base64.b64decode(image_data)
 
                 zf.writestr(f"image_{i+1}.png", image_binary)
+            zf.write('parameters.txt', arcname='parameters.txt')
         except FileNotFoundError:
             print("An error occurred while zipping the files")
         finally:
