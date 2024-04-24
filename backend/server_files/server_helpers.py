@@ -1,5 +1,13 @@
 from helpers import MainCallable, StringDefinitionsHelper
+from helpers import DataCollectionHelper
 
+def get_column_names1(file_name):
+    """
+    :param file_name: File from which column names should be extracted
+    :return: Array of column names
+    """
+    columns = DataCollectionHelper.get_columns(file_name=file_name)
+    return columns
 
 async def cluster_helper(method, clustering_details,file_name,clusterDataOn):
     """
@@ -13,7 +21,6 @@ async def cluster_helper(method, clustering_details,file_name,clusterDataOn):
         scores = await MainCallable.execute(method, clustering_details, file_name, StringDefinitionsHelper.FILE_FORMAT_TWO,
                                    clustered_column=clusterDataOn)
     except Exception as e:
-        print("e: ", e)
         error = e.args
         response = createResponse(e, "","","")
         return response, scores

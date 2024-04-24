@@ -27,7 +27,7 @@ sys.path.append("../")
 
 from helpers import StringDefinitionsHelper
 from helpers.ComparisonHelper import compare_cluster
-from server_helpers import cluster_helper
+from server_helpers import get_column_names1, cluster_helper
 from subscriptions import subscription
 from json_data import data
 
@@ -409,6 +409,21 @@ async def resolve_deleteConfig(_,info,name,datasetName, project):
                     return True
             return False
 
+async def get_column_names(file_name):
+    """
+    Gets the display name for a clustering method
+    :param _: Unused parameter
+    :param file_name: Used to get the column names
+    """
+
+    #Everytime columns get populated, the zip files will get deleted
+    delete_generated_files()
+    file_url=getDatasetURL(file_name,"Project_3")
+    columns_to_remove = ['Markers', 'X Position', 'Y Position']
+    columns = get_column_names1(file_name=file_url)
+    columns = list(filter(lambda x: x not in columns_to_remove, columns))
+    return columns
+
 @query.field("clusteringMethods")
 def resolve_clusteringMethods(_, info):
     """
@@ -753,6 +768,16 @@ async def resolve_spectral_cluster(
     )
     return populate_response_with_image_url(response)
 
+def delete_generated_files():
+    """
+    This is a housekeeping function.
+    It deletes all the files generated for download
+    """
+    current_directory = os.getcwd()
+    files = os.listdir(current_directory)
+    for file in files:
+        if file.endswith('.zip') or file.endswith('.xlsx'):
+            os.remove(os.path.join(current_directory, file))
 
 schema = make_executable_schema(
     type_defs,

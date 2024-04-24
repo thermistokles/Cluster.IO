@@ -18,10 +18,12 @@ import pandas as pd
 from os import listdir
 from os.path import isfile, join
 
-from server import resolve_kMeans_cluster, resolve_birch_cluster, resolve_agglomerative_cluster, resolve_dbscan_cluster, resolve_Datasets, resolve_uploadDataset
+from server import resolve_kMeans_cluster, resolve_birch_cluster, resolve_agglomerative_cluster, resolve_dbscan_cluster, resolve_Datasets, resolve_uploadDataset, get_column_names
 
 #Dash application
-app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG, dbc.icons.BOOTSTRAP, "dash_app.css", dbc.icons.BOOTSTRAP])
+app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG, dbc.icons.BOOTSTRAP, "dash_app.css", dbc.icons.BOOTSTRAP], suppress_callback_exceptions=True)
+
+dataset_features = []
 
 #Initialize datasets
 datasets = list(resolve_Datasets(None, None, "Project_3"))
@@ -74,6 +76,7 @@ df = pd.DataFrame(
 previous_results = []
 previous_images = {}
 cluster_details = {}
+
 
 #This is the initial layout of the application
 app.layout = dbc.Container(
@@ -191,13 +194,11 @@ app.layout = dbc.Container(
                                     style={'width': '100%'}
                                 ),
                                 html.Br(),
+
+                                #Check the datasets output
                                 dbc.Label("Select Cluster Data On:"),
-                                dcc.Checklist(
-                                    ['X Position', 'Y Position', 'Z Position', 'Depth', 'Load', 'Stiffness', 'Hardness', 'Modulus'],
-                                    ['Hardness', 'Modulus'],
-                                    id="radioitems-input",
-                                    style={'display' : 'none'}
-                                ),
+                                dcc.Checklist(id="radioitems-input"),
+
                                 dbc.Button("Perform Clustering", color="success", className="me-1", id="perform-button"),
                             ],
                             style={'padding' : '2%'}
@@ -223,16 +224,6 @@ def persist_results(value):
         return 'Clustering results will persist now'
     else:
         previous_results = []
-
-#Display the cluster Data on checkboxes
-@app.callback(
-    Output('radioitems-input', 'style'),
-    Input('Dataset', 'value')
-)
-def display_cluster_data_on(file):
-    if file:
-        return {'display' : 'block'}
-    return {'display' : 'none'}
 
 #Upload file functionality
 @app.callback(
@@ -260,6 +251,29 @@ def uploadFile(filename, contents):
     datasets = list(resolve_Datasets(None, None, "Project_3"))
     options = [{'label': dataset['name'], 'value': dataset['name']} for dataset in datasets]
     return f"File {filename[0]} uploaded successfully.", options
+
+#Display dataset columns
+@app.callback(
+    Output('radioitems-input', 'options'),
+    Input('Dataset', 'value'),
+    prevent_initial_call=True
+)
+def updateClusteredDataOn(dataset):
+    #global dataset_features
+
+    features = []
+
+    if dataset:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        #Get the column names when the user selects a dataset
+        results = loop.run_until_complete(get_column_names(dataset))
+
+        for result in results:
+            features.append({'label' : result, 'value' : result})
+
+    return features
 
 #Updating the parameters according to the algorithm
 @app.callback(
@@ -357,8 +371,11 @@ def update_algorithm_inputs(selected_algorithm):
 def update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, dataset, algorithm, cluster_data_on, lock_results):
     #Default project is Project_3
     project = "Project_3"
+    print("cluster_data_on: ", cluster_data_on)
     cluster_data_on = 'Modulus'
+
     if n_clicks:
+        
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
@@ -488,15 +505,11 @@ def download_images(n_clicks, card_id):
     card_index = card_id['index']
 
     if n_clicks:
-        #path = '../temp_image/'
-
-        #return
 
         images_to_download = previous_images[card_index]
 
-        compression = zipfile.ZIP_DEFLATED
+        #compression = zipfile.ZIP_DEFLATED
         # create the zip file first parameter path/name, second mode
-        #Need to change this to get values from previous results array
         zf = zipfile.ZipFile(str(card_index) + '.zip', mode="w")
 
         file_path = 'parameters.txt'
@@ -509,6 +522,10 @@ def download_images(n_clicks, card_id):
                     f.write(f'{key}: {value}\n')
 
         try:
+            #Add the dataframe to zip
+            zf.write('dataframe.xlsx', arcname='dataframe.xlsx')
+
+            #Add images to zip
             for i, image_data in enumerate(images_to_download):
                 image_binary = base64.b64decode(image_data)
 
@@ -522,15 +539,15 @@ def download_images(n_clicks, card_id):
         return dcc.send_file(str(card_index) + '.zip')
     raise PreventUpdate
 
-
+#Not being used. Might remove later
 #Generate a random string based on the length of the previous_array
 def generate_id():
-    length = len(previous_results)
+    results_length = len(previous_results)
 
     alphanumeric_chars = string.ascii_letters + string.digits 
 
-    if length > 0:
-        id_string = ''.join(random.choice(alphanumeric_chars) for _ in range(length))
+    if results_length > 0:
+        id_string = ''.join(random.choice(alphanumeric_chars) for _ in range(results_length))
 
     else:
         id_string = "output_card"

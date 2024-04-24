@@ -20,6 +20,7 @@ class ExcelFileReaderHelper:
         self.test_sheets = []
         self.current_sheet_index = 0
         self.current_sheet = ""
+        self.sheet_columns = []
 
     def read_from_excel(self, file_path="data/1.16 um Radii Spherical Nanoindentation of 99.99 Percent CP Al.xlsx"):
         """
@@ -55,6 +56,7 @@ class ExcelFileReaderHelper:
             test1_sheet = pd.read_excel(self.xls, sheet_name, )
         else:
             test1_sheet = pd.read_excel(self.xls, sheet_name, ).dropna()
+
         if any(isinstance(val, str) for val in test1_sheet.iloc[0]):
             skip_first_row = True
         else:
@@ -218,12 +220,22 @@ class ExcelFileReaderHelper:
         return self.read_next_sheet(skip_first_row=True, use_cols="A:I", hard_col_name="HARDNESS",
                                     mod_col_name="MODULUS", x_col_name="X Position", y_col_name="Y Position",
                                     get_stiffness=get_stiffness, stif_col_name="Stiffness", nulls=nulls)
+    
+    def get_sheet_columns(self):
+        """
+        :param sheet_name: The name of the sheet to get from the excel document
 
-    #Find the sheet with either Hardness or Modulus
-    # def read_next_sheet_format3(skip_first_row=True, use_cols="B:X", hard_col_name="HARDNESS", nulls=nulls,
-    #                                 mod_col_name="MODULUS", x_col_name="X Axis Position", y_col_name="Y Axis Position"):
-    #     return self.read_next_sheet(skip_first_row=True, use_cols="A:I", hard_col_name="HARDNESS",
-    #                                 mod_col_name="MODULUS", x_col_name="X Position", y_col_name="Y Position",
-    #                                 get_stiffness=get_stiffness, stif_col_name="Stiffness", nulls=nulls) or self.read_next_sheet(skip_first_row=True, use_cols="A:I", hard_col_name="HARDNESS",
-    #                                 mod_col_name="MODULUS", x_col_name="X Position", y_col_name="Y Position",
-    #                                 get_stiffness=get_stiffness, stif_col_name="Stiffness", nulls=nulls)
+        Reads from the excel document already stored in memory, reading a single sheet. Returns all the columns from the sheet.
+        """
+
+        if not self.found_sheet_names:
+            self.get_test_sheets()
+
+        current_sheet = self.test_sheets[self.current_sheet_index]
+        self.current_sheet = current_sheet
+        self.current_sheet_index = self.current_sheet_index + 1
+
+        test1_sheet = pd.read_excel(self.xls, current_sheet)
+        self.sheet_columns = list(test1_sheet.columns)
+
+        return self.sheet_columns

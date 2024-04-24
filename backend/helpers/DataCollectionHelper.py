@@ -5,6 +5,20 @@ sys.path.append("../")
 
 from helpers import Errors, ExcelFileReaderHelper, StringDefinitionsHelper
 
+def get_columns(file_name):
+    """
+
+    :param file_name: The name of the file being read in
+
+    Gets all the required column names from the excel file that's stored in the data folder.
+
+    """
+    efrh = ExcelFileReaderHelper.ExcelFileReaderHelper()
+    efrh.read_from_excel(file_path=file_name)
+
+    columns = efrh.get_sheet_columns()
+
+    return columns
 
 def get_data(file_name, file_format, clustered_column):
     """
@@ -44,6 +58,9 @@ def get_data(file_name, file_format, clustered_column):
     print("data_df: ", data_df)
     print("x_df: ", x_df)
     print("y_df: ", y_df)
+
+    #Exporting the dataframe to excel in server files
+    data_df.to_excel('../server_files/dataframe.xlsx', index=False)
     
     #data_df=hard_mod_df
     return data_df, x_df, y_df
