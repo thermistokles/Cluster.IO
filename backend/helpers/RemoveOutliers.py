@@ -26,6 +26,8 @@ def remove_data_from_outliers(data_df, x_df, y_df, show_plots=False, show_extra_
 
     """
 
+    print("data_df: ", data_df)
+
     pdfh = PDFHelper.PDFHelper()
 
     pdfh.calculate_vals(input_data=data_df["Data"].values)
@@ -155,6 +157,7 @@ def correct_nulls(data_df, x_df, y_df, show_plots=False, show_extra_plots=False)
         ret_df = pd.DataFrame(interpolation_result_two, columns=["Data"])
         return ret_df
     elif "Hardness" in data_df.columns and "Modulus" in data_df.columns:
+        print("hardness or modulus is present in the dataframe")
         # Interpolate the "Hardness" and "Modulus" columns separately
         hardness_data = data_df["Hardness"].values
         modulus_data = data_df["Modulus"].values
@@ -171,6 +174,19 @@ def correct_nulls(data_df, x_df, y_df, show_plots=False, show_extra_plots=False)
 
         # Concatenate the two DataFrames
         ret_df = pd.concat([hardness_df, modulus_df], axis=1)
+
+    else:
+        print("custom dataframe")
+        ret_df = pd.DataFrame()
+
+        # Iterate over each column in data_df
+        for column in data_df.columns:
+            # Apply complete_interpolation function to the column data
+            interpolated_data = complete_interpolation(data_df[column].values, x_df, y_df, "cubic")
+            interpolated_data = complete_interpolation(interpolated_data, x_df, y_df, "nearest")
+            
+            # Add the interpolated data to the interpolated DataFrame with the column name
+            ret_df[column] = interpolated_data.flatten()
 
         return ret_df
 

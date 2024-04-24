@@ -74,6 +74,7 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
         hard_df_no_outliers["Data"] = no_outliers
 
         altered_df = hard_df_no_outliers
+
     if clustering_method == StringDefinitionsHelper.AGGLOMERATIVE_LABEL:
         # Agglomerative Clustering
         num_clusters = int(clustering_details[StringDefinitionsHelper.NUM_CLUSTERS_LABEL])
@@ -185,6 +186,10 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
 
     # Get new DataFrame with ordered clusters
     new_df = order_clusters(data_df=data_df, clustered_data_df=clustered_df)
+
+    print("new_df: ", new_df)
+
+    print("scores: ", scores)
 
     return new_df, scores
 
@@ -330,6 +335,8 @@ def perform_k_means(data_df, num_clusters=3, random_state=0):
     k_means = KMeans(n_clusters=num_clusters, random_state=random_state).fit(data_df)
     
     k_means_results = k_means.predict(data_df)
+
+    print("k_means_results: ", k_means_results)
 
     # silhouette = silhouette_score(data_df, k_means_results)
     # davies_bouldin = davies_bouldin_score(data_df, k_means_results)

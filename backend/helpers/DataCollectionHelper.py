@@ -41,7 +41,10 @@ def get_data(file_name, file_format, clustered_column):
     elif file_format == StringDefinitionsHelper.FILE_FORMAT_TWO:
         print("file format is two")
         hard_df, modu_df, x_df, y_df,hard_mod_df = efrh.read_next_sheet_format2(nulls=True)
-        print("File format 2 processed")
+    elif file_format == StringDefinitionsHelper.FILE_FORMAT_THREE:
+        print("file format is three")
+        hard_df, modu_df, x_df, y_df, hard_mod_df = efrh.read_next_sheet_format3(clustered_column, nulls=True)
+        print("File format 3 processed")
     else:
         raise Errors.InvalidClusteringFileFormat(file_format)
     
@@ -51,11 +54,12 @@ def get_data(file_name, file_format, clustered_column):
         data_df = modu_df
     elif clustered_column=="Hard_Mod":
         data_df=hard_mod_df
+    elif isinstance(clustered_column, list):
+        data_df = hard_mod_df
     else:
         print("there was an error")
         raise Errors.InvalidClusteringColumn(clustered_column)
     
-    print("data_df: ", data_df)
     print("x_df: ", x_df)
     print("y_df: ", y_df)
 

@@ -18,7 +18,7 @@ async def cluster_helper(method, clustering_details,file_name,clusterDataOn):
     """
     scores = []
     try:
-        scores = await MainCallable.execute(method, clustering_details, file_name, StringDefinitionsHelper.FILE_FORMAT_TWO,
+        scores = await MainCallable.execute(method, clustering_details, file_name, StringDefinitionsHelper.FILE_FORMAT_THREE,
                                    clustered_column=clusterDataOn)
     except Exception as e:
         error = e.args

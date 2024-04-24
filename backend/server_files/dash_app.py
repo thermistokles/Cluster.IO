@@ -371,8 +371,7 @@ def update_algorithm_inputs(selected_algorithm):
 def update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, dataset, algorithm, cluster_data_on, lock_results):
     #Default project is Project_3
     project = "Project_3"
-    print("cluster_data_on: ", cluster_data_on)
-    cluster_data_on = 'Modulus'
+    #cluster_data_on = 'Hard_Mod'
 
     if n_clicks:
         

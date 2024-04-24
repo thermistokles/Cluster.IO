@@ -262,6 +262,7 @@ MODULUS_LABEL = "Modulus"
 # File reading properties:
 FILE_FORMAT_ONE = "format_1"
 FILE_FORMAT_TWO = "format_2"
+FILE_FORMAT_THREE = "format_3"
 
 
 # Directory Defaults

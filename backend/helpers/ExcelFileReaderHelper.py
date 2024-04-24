@@ -31,7 +31,7 @@ class ExcelFileReaderHelper:
         """
         self.xls = pd.ExcelFile(file_path)
 
-    def get_sheet(self, sheet_name, skip_first_row=True, use_cols="D:T", hard_col_name="HARDNESS",
+    def get_sheet(self, clustered_columns, sheet_name, skip_first_row=True, use_cols="D:T", hard_col_name="HARDNESS",
                   mod_col_name="MODULUS", x_col_name="X Position", y_col_name="Y Position", get_stiffness=False,
                   stif_col_name="Stiffness", nulls=False):
         """
@@ -119,11 +119,16 @@ class ExcelFileReaderHelper:
         if get_stiffness:
             stif_df["Data"] = pd.to_numeric(stif_df["Data"], downcast="float")
             return hard_df, modu_df, x_df, y_df, stif_df
-        hard_mod_df = pd.concat([hard_df, modu_df], axis=1)
-        hard_mod_df.columns = ['Hardness', 'Modulus']
+        # hard_mod_df = pd.concat([hard_df, modu_df], axis=1)
+        # hard_mod_df.columns = ['Hardness', 'Modulus']
+
+        filtered_columns = [col for col in test1_sheet.columns if col in clustered_columns]
+        hard_mod_df = test1_sheet[filtered_columns].iloc[1:]
+        hard_mod_df = hard_mod_df.apply(pd.to_numeric, errors='coerce', downcast='float')
+
         return hard_df, modu_df, x_df, y_df,hard_mod_df
 
-    def read_next_sheet(self, skip_first_row=True, use_cols="D:T", hard_col_name="HARDNESS", mod_col_name="MODULUS",
+    def read_next_sheet(self, clustered_columns, skip_first_row=True, use_cols="D:T", hard_col_name="HARDNESS", mod_col_name="MODULUS", 
                         x_col_name="X Position", y_col_name="Y Position", get_stiffness=False,
                         stif_col_name="Stiffness", nulls=False):
         """
@@ -150,7 +155,7 @@ class ExcelFileReaderHelper:
         self.current_sheet = current_sheet
         self.current_sheet_index = self.current_sheet_index + 1
 
-        return self.get_sheet(skip_first_row=skip_first_row, use_cols=use_cols, hard_col_name=hard_col_name,
+        return self.get_sheet(clustered_columns, skip_first_row=skip_first_row, use_cols=use_cols, hard_col_name=hard_col_name,
                               mod_col_name=mod_col_name, sheet_name=current_sheet, x_col_name=x_col_name, nulls=nulls,
                               y_col_name=y_col_name, get_stiffness=get_stiffness, stif_col_name=stif_col_name)
 
@@ -167,12 +172,9 @@ class ExcelFileReaderHelper:
         sheet_names = self.xls.sheet_names
 
         for name in sheet_names:
-            # print(name)
             if name[0:4] == "Test":
                 self.test_sheets.append(name)
 
-        # print("Names of sheets being read from as test sheets are:")
-        # print(self.test_sheets)
         self.found_sheet_names = True
         return
 
@@ -201,7 +203,7 @@ class ExcelFileReaderHelper:
 
         """
 
-        return self.read_next_sheet(skip_first_row=True, use_cols="B:X", hard_col_name="HARDNESS", nulls=nulls,
+        return self.read_next_sheet(skip_first_row=True, use_cols="B:X", hard_col_name="HARDNESS", nulls=nulls, clustered_column=[],
                                     mod_col_name="MODULUS", x_col_name="X Axis Position", y_col_name="Y Axis Position")
 
     def read_next_sheet_format2(self, get_stiffness=False, nulls=False):
@@ -217,7 +219,28 @@ class ExcelFileReaderHelper:
 
         """
 
-        return self.read_next_sheet(skip_first_row=True, use_cols="A:I", hard_col_name="HARDNESS",
+        return self.read_next_sheet(skip_first_row=True, use_cols="A:I", hard_col_name="HARDNESS", clustered_column=[],
+                                    mod_col_name="MODULUS", x_col_name="X Position", y_col_name="Y Position",
+                                    get_stiffness=get_stiffness, stif_col_name="Stiffness", nulls=nulls)
+    
+    #This is the new implementation
+    #Feel free to remove read_next_sheet_format1 and read_next_sheet_format2 after this is implemented
+    def read_next_sheet_format3(self, clustered_columns, get_stiffness=False, nulls=False):
+        """
+
+        :param get_stiffness: Boolean of whether or not to get the stiffness column
+        :param nulls: Whether or not to include nulls in the data
+
+        :return: A DataProcessingHelper that represents the excel sheet that is being read
+
+        Reads an excel sheet in the format of the sheets we were given that has three phases and was given
+        around 8/3/20.
+
+        """
+
+        print("clustered_columns: ", clustered_columns)
+
+        return self.read_next_sheet(clustered_columns, skip_first_row=True, use_cols="A:I", hard_col_name="HARDNESS",
                                     mod_col_name="MODULUS", x_col_name="X Position", y_col_name="Y Position",
                                     get_stiffness=get_stiffness, stif_col_name="Stiffness", nulls=nulls)
     
