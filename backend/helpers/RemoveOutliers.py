@@ -26,8 +26,6 @@ def remove_data_from_outliers(data_df, x_df, y_df, show_plots=False, show_extra_
 
     """
 
-    print("data_df: ", data_df)
-
     pdfh = PDFHelper.PDFHelper()
 
     pdfh.calculate_vals(input_data=data_df["Data"].values)
@@ -176,7 +174,6 @@ def correct_nulls(data_df, x_df, y_df, show_plots=False, show_extra_plots=False)
         ret_df = pd.concat([hardness_df, modulus_df], axis=1)
 
     else:
-        print("custom dataframe")
         ret_df = pd.DataFrame()
 
         # Iterate over each column in data_df

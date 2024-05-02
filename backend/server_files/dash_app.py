@@ -15,10 +15,9 @@ import string
 import zipfile
 import pandas as pd
 
-from os import listdir
-from os.path import isfile, join
-
-from server import resolve_kMeans_cluster, resolve_birch_cluster, resolve_agglomerative_cluster, resolve_dbscan_cluster, resolve_Datasets, resolve_uploadDataset, get_column_names
+from server import resolve_kMeans_cluster, resolve_birch_cluster, resolve_agglomerative_cluster, resolve_dbscan_cluster, \
+    resolve_kmedoids_cluster, resolve_gaussianmixturemodel_cluster, resolve_optics_cluster, \
+    resolve_Datasets, resolve_uploadDataset, get_column_names, resolve_deleteDataset
 
 #Dash application
 app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG, dbc.icons.BOOTSTRAP, "dash_app.css", dbc.icons.BOOTSTRAP], suppress_callback_exceptions=True)
@@ -27,51 +26,6 @@ dataset_features = []
 
 #Initialize datasets
 datasets = list(resolve_Datasets(None, None, "Project_3"))
-
-#Datasets radio buttons
-def create_radio_button(value):
-    radioitem = html.Div(
-        [
-            dbc.RadioItems(
-                options=[
-                    {"value": value},
-                ],
-                id="radioitems-" + value,
-            ),
-        ]
-    )
-
-    return radioitem
-
-#Datasets delete button
-def create_delete_button(index):
-    delete_icon = html.I(className="bi bi-trash")
-
-    return dbc.Button(
-        delete_icon, color="danger",
-        className="me-1",
-        # id={
-        #     'type' : 'delete_button',
-        #     'index' : index
-        # }
-    )
-
-#Delete dataset functionality based on pattern matching
-# @app.callback(
-#     Output({'type': 'my-delete-button-output', 'index': MATCH}, 'children'),
-#     Input({'type': 'delete_button', 'index': MATCH}, 'index'),
-# )
-# def delete_dataset(index):
-#     if index:
-#         print("dataset_name: ", index)
-#         return ''
-#     raise PreventUpdate
-
-df = pd.DataFrame(
-    {'select' : [create_radio_button(dataset['name']) for dataset in datasets],
-    'Dataset' : [dataset['name'] for dataset in datasets],
-    'Delete' : [create_delete_button(index) for index in range(len(datasets))]}
-)
 
 previous_results = []
 previous_images = {}
@@ -124,9 +78,8 @@ app.layout = dbc.Container(
                             dcc.Dropdown(
                                 id='Dataset',
                                 options=[{'label': dataset['name'], 'value': dataset['name']} for dataset in datasets],
-                                style={'width': '100%'}
+                                style={'width': '100%'},
                             ),
-                            dbc.Table.from_dataframe(df, bordered=True, striped=True),
                             html.Div(id='my-delete-button-output'),
                             html.Br(),
                             daq.BooleanSwitch(
@@ -136,6 +89,8 @@ app.layout = dbc.Container(
                                 on=False,
                                 color="green",
                             ),
+                            dbc.Button("Delete dataset", color="danger", id='delete-button'),
+                            html.Div(id='delete-output'),
                             html.Div(id='my-toggle-switch-output')
                         ],
                         style={'padding' : '2%'}
@@ -164,6 +119,9 @@ app.layout = dbc.Container(
                                         {'label': 'Birch', 'value': 'Birch'},
                                         {'label': 'Agglomerative', 'value': 'Agglomerative'},
                                         {'label': 'DBSCAN', 'value': 'DBSCAN'},
+                                        {'label': 'KMedoids', 'value': 'KMedoids'},
+                                        {'label': 'Gaussian Mixture Model', 'value': 'Gaussian Mixture Model'},
+                                        {'label': 'Optics', 'value': 'Optics'},
                                     ],
                                     className="dash-bootstrap"
                                 ),
@@ -190,6 +148,17 @@ app.layout = dbc.Container(
                                         {'label': 'ball_tree', 'value': 'ball_tree'},
                                         {'label': 'kd_tree', 'value': 'kd_tree'},
                                         {'label': 'brute', 'value': 'brute'},
+                                    ],
+                                    style={'width': '100%'}
+                                ),
+                                html.Label("Enter init", id="km_init_label", style={'display': 'none'}),
+                                dcc.Dropdown(
+                                    id='km_init',
+                                    options=[
+                                        {'label': 'Random', 'value': 'random'},
+                                        {'label': 'Heuristic', 'value': 'heuristic'},
+                                        {'label': 'k-medoids++', 'value': 'k-medoids++'},
+                                        {'label': 'Build', 'value': 'build'},
                                     ],
                                     style={'width': '100%'}
                                 ),
@@ -225,32 +194,51 @@ def persist_results(value):
     else:
         previous_results = []
 
-#Upload file functionality
+#Upload/delete file functionality
 @app.callback(
     Output('output-file-info', 'children'),
     Output('Dataset', 'options'),
     Input('upload-data', 'filename'),
     Input('upload-data', 'contents'),
+    Input("delete-button", "n_clicks"),
+    State('Dataset', 'value'),    
     prevent_initial_call=True
 )
-def uploadFile(filename, contents):
+def uploadFile(filename, contents, delete_click, selected_dataset):
     global datasets
-
-    if contents is None:
-        return "Invalid file"
+    not_clicked_handler = False
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    #Get list of files
-    for name, data in zip(filename, contents):
-        result = loop.run_until_complete(resolve_uploadDataset(None, None, name, data, "", "Project_3"))
+    #File(s) uploaded
+    if filename:
+        if contents is None:
+            return "Invalid file"
+        #Get list of files
+        for name, data in zip(filename, contents):
+            result = loop.run_until_complete(resolve_uploadDataset(None, None, name, data, "", "Project_3"))
+
+    #Delete button clicked
+    if delete_click:
+        if selected_dataset:
+            loop.run_until_complete(resolve_deleteDataset(None, None, selected_dataset, "Project_3"))
+        else:
+            not_clicked_handler = True
     loop.close
 
     #Update the datasets list after the upload
     datasets = list(resolve_Datasets(None, None, "Project_3"))
     options = [{'label': dataset['name'], 'value': dataset['name']} for dataset in datasets]
-    return f"File {filename[0]} uploaded successfully.", options
+    if filename:
+        return f"File {filename[0]} uploaded successfully.", options
+    if delete_click:
+        if not_clicked_handler:
+            return "Dataset not selected", options
+        return f"{selected_dataset} has been deleted", options
+    
+    return '', options
+
 
 #Display dataset columns
 @app.callback(
@@ -286,6 +274,7 @@ def updateClusteredDataOn(dataset):
      Output("eps", "style"),
      Output("min_samples", "style"),
      Output("dbs_algorithm", "style"),
+     Output("km_init", "style"),
      #Labels
      Output("clusters_label", "style"),
      Output("random_state_label", "style"),
@@ -294,7 +283,8 @@ def updateClusteredDataOn(dataset):
      Output("linkage_label", "style"),
      Output("eps_label", "style"),
      Output("min_samples_label", "style"),
-     Output("dbs_algorithm_label", "style"),],
+     Output("dbs_algorithm_label", "style"),
+     Output("km_init_label", "style")],
     [Input("Algorithm", "value")]
 )
 
@@ -309,6 +299,7 @@ def update_algorithm_inputs(selected_algorithm):
     eps_style = {'display': 'none'}
     min_samples_style = {'display': 'none'}
     dbs_algorithm_style = {'display': 'none'}
+    km_init_style = {'display': 'none'}
 
     clusters_label_style = {'display': 'none'}
     random_state_label_style = {'display': 'none'}
@@ -318,6 +309,7 @@ def update_algorithm_inputs(selected_algorithm):
     eps_label_style = {'display': 'none'}
     min_samples_label_style = {'display': 'none'}
     dbs_algorithm_label_style = {'display': 'none'}
+    km_init_label_style = {'display': 'none'}
 
     if selected_algorithm == 'K Means':
         clusters_label_style = {'display': 'block'}
@@ -347,7 +339,28 @@ def update_algorithm_inputs(selected_algorithm):
         dbs_algorithm_style = {'display': 'block'}
         dbs_algorithm_label_style = {'display': 'block'}
 
-    return clusters_label_style, random_state_label_style, threshold_label_style, branching_factor_label_style, linkage_label_style, eps_label_style, min_samples_label_style, dbs_algorithm_label_style, num_clusters_style, random_state_style, threshold_style, branching_factor_style, linkage_style, eps_style, min_samples_style, dbs_algorithm_style
+    elif selected_algorithm == "KMedoids":
+        clusters_label_style = {'display': 'block'}
+        num_clusters_style = {'display': 'block'}
+        random_state_label_style = {'display': 'block'}
+        random_state_style = {'display': 'block'}
+        km_init_label_style = {'display': 'block'}
+        km_init_style = {'display': 'block'}
+    
+    elif selected_algorithm == "Gaussian Mixture Model":
+        clusters_label_style = {'display': 'block'}
+        num_clusters_style = {'display': 'block'}
+
+    elif selected_algorithm == "Optics":
+        print("algorithm: ", selected_algorithm)
+        eps_style = {'display': 'block'}
+        eps_label_style = {'display': 'block'}
+        min_samples_style = {'display': 'block'}
+        min_samples_label_style = {'display': 'block'}
+        dbs_algorithm_style = {'display': 'block'}
+        dbs_algorithm_label_style = {'display': 'block'}
+
+    return clusters_label_style, random_state_label_style, threshold_label_style, branching_factor_label_style, linkage_label_style, eps_label_style, min_samples_label_style, dbs_algorithm_label_style, km_init_label_style, num_clusters_style, random_state_style, threshold_style, branching_factor_style, linkage_style, eps_style, min_samples_style, dbs_algorithm_style, km_init_style
 
 #Getting the output and updating the results
 @app.callback(
@@ -362,23 +375,25 @@ def update_algorithm_inputs(selected_algorithm):
         State("eps", "value"),
         State("min_samples", "value"),
         State("dbs_algorithm", "value"),
+        State("km_init", "value"),
         State("Dataset", "value"),
         State("Algorithm", "value"),
         State("radioitems-input", "value"),
         State("my-toggle-switch", "on")
     ]
 )
-def update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, dataset, algorithm, cluster_data_on, lock_results):
+def update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, km_init, dataset, \
+                  algorithm, cluster_data_on, lock_results):
     #Default project is Project_3
     project = "Project_3"
-    #cluster_data_on = 'Hard_Mod'
 
     if n_clicks:
         
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
-        result = loop.run_until_complete(async_update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, project, dataset, algorithm, cluster_data_on, lock_results))
+        result = loop.run_until_complete(async_update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, \
+                                                             min_samples, dbs_algorithm, km_init, project, dataset, algorithm, cluster_data_on, lock_results))
         loop.close()
 
         previous_results.insert(0, result)
@@ -389,7 +404,13 @@ def update_output(n_clicks, num_clusters, random_state, threshold, branching_fac
 
     
 #Perform clustering according to the inputs
-async def async_update_output(n_clicks, num_clusters, random_state, threshold, branching_factor, linkage, eps, min_samples, dbs_algorithm, project, dataset, algorithm, cluster_data_on, lock_results):
+async def async_update_output(n_clicks, num_clusters, \
+                              random_state, \
+                              threshold, branching_factor, \
+                              linkage, \
+                              eps, min_samples, dbs_algorithm, \
+                              km_init, \
+                              project, dataset, algorithm, cluster_data_on, lock_results):
 
     #Get images based on input algorithm and parameters
     if algorithm == 'K Means':
@@ -400,6 +421,12 @@ async def async_update_output(n_clicks, num_clusters, random_state, threshold, b
         clustering_output, scores = await resolve_agglomerative_cluster(None, None, num_clusters, linkage, dataset, cluster_data_on, project)
     if algorithm == 'DBSCAN':
         clustering_output, scores = await resolve_dbscan_cluster(None, None, eps, min_samples, dbs_algorithm, dataset, cluster_data_on, project)
+    if algorithm == 'KMedoids':
+        clustering_output, scores = await resolve_kmedoids_cluster(None, None, num_clusters, km_init, random_state, dataset, cluster_data_on, project)
+    if algorithm == 'Gaussian Mixture Model':
+        clustering_output, scores = await resolve_gaussianmixturemodel_cluster(None, None, num_clusters, dataset, cluster_data_on, project)
+    if algorithm == 'Optics':
+        clustering_output, scores = await resolve_optics_cluster(None, None, eps, min_samples, dbs_algorithm, dataset, cluster_data_on, project)
 
     #Extract images and scores from the output
     raw_data_image = clustering_output.get('rawData', None)
@@ -416,20 +443,37 @@ async def async_update_output(n_clicks, num_clusters, random_state, threshold, b
 
     #Download button
     downloadIcon = html.I(className='bi bi-download', style=dict(display='inline-block', ))
+
+    #Add images to hashmap for download functionality
+    previous_images[n_clicks] = [raw_data_image, clustered_data_image, clusters_fractions_image]
+    cluster_details[n_clicks] = {
+        'Algorithm' : algorithm,
+        'Number of clusters' : num_clusters,
+        'random_state' : random_state,
+        'threshold' : threshold,
+        'branching_factor' : branching_factor,
+        'linkage' : linkage,
+        'eps' : eps,
+        'min_samples' : min_samples,
+        'dbs_algorithm' : dbs_algorithm,
+        'km_init' : km_init,
+        'silhouette_score' : silhouette_score,
+        'davis_bouldin_score' : davis_bouldin_score,
+        'calinski_harabasz_score' : calinski_harabasz_score
+    }
+
+    #Prepare the div content to provide clustering details
+    output_features = []
+    for key, value in cluster_details[n_clicks].items():
+        if value:
+            output_features.append(html.P(f"{key}: {value}"))
     
     #Return dynamically generated output using with custom IDs for pattern matching
     result = dbc.Card([
         dbc.Row(
             [
                 html.Br(),
-                dbc.Col([
-                    html.P(f"Dataset: {dataset}"),
-                    html.P(f"Algorithm: {algorithm}"),
-                    html.P(f"Num Clusters: {num_clusters}"),
-                    html.P(f"Random State: {random_state}"),
-                    html.P(f"Cluster Data On: {cluster_data_on}"),
-                ],
-                width = 6),
+                dbc.Col(output_features, width = 6),
                 dbc.Col([
                     dbc.Button(children=[downloadIcon], color="info", className="download", id={'type' : 'download_button', 'index' : n_clicks}),
                     dcc.Download(id={'type' : 'download-image', 'index' : n_clicks}),
@@ -446,32 +490,11 @@ async def async_update_output(n_clicks, num_clusters, random_state, threshold, b
             dbc.Col(clusters_fractions_html),
         ],
         ),
-        dbc.Row(
-            [
-                html.P(f"Silhouette score: {silhouette_score}" ),
-                html.P(f"Davis Bouldin score: {davis_bouldin_score}" ),
-                html.P(f"Calinski Harabasz score: {calinski_harabasz_score}"),
-            ]
-        ),
     ],
     id={
         'type' : 'output_card',
         'index' : n_clicks
     })
-
-    #Add images to hashmap for download functionality
-    previous_images[n_clicks] = [raw_data_image, clustered_data_image, clusters_fractions_image]
-    cluster_details[n_clicks] = {
-        'Algorithm' : algorithm,
-        'Number of clusters' : num_clusters,
-        'random_state' : random_state,
-        'threshold' : threshold,
-        'branching_factor' : branching_factor,
-        'linkage' : linkage,
-        'eps' : eps,
-        'min_samples' : min_samples,
-        'dbs_algorithm' : dbs_algorithm
-    }
 
     return result
 
@@ -515,10 +538,12 @@ def download_images(n_clicks, card_id):
 
         # Open the file in write mode
         with open(file_path, 'w') as f:
-            # Iterate over the dictionary items and write them to the file
+            # Iterate over the parameters and write them to the file
             for key, value in cluster_details[n_clicks].items():
                 if cluster_details[n_clicks][key]:
                     f.write(f'{key}: {value}\n')
+
+            #Record the scores in the file
 
         try:
             #Add the dataframe to zip

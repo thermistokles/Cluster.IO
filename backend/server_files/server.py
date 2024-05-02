@@ -192,9 +192,6 @@ async def resolve_uploadDataset(_,info,name, file, description, project="Default
     """
     Returns the dataset given a name
     """
-    print(name)
-    print(file)
-    print(project)
     
     # Create the directory for the database if it does not exist
     database_path = os.path.join(os.getcwd(), 'Database')
@@ -344,50 +341,29 @@ async def resolve_deleteProject(_,info,name):
 @mutation.field("deleteDataset")
 async def resolve_deleteDataset(_,info,name, project="Default"):
     """
-    Returns the dataset of the recently uploaded dataset
+    Deletes the selected dataset
     """
-    for temp in datasets["projects"]:
+    for index, temp in enumerate(datasets["projects"]):
         if (temp["name"]==project):
             for ind,file in enumerate(temp["datasets"]):
                 if (file["name"]==name):
                     url=file["url"]
-                    #bucket_name = url.split("//")[1].split(".")[0]
-                    #file_key = url.split("//")[1].split("/", 1)[1]
-                    #s3.delete_object(Bucket=bucket_name, Key=file_key)
+
+                    deleted_dataset = datasets["projects"][index]["datasets"][ind]
+
+                    #Remove the dataset file and directory from it's location
                     dir_path = os.path.dirname(url)
                     os.remove(url)
                     os.rmdir(dir_path)
-                    del temp["datasets"][ind]
+
+                    #Remove the dataset from the database
+                    datasets["projects"][index]["datasets"] = [data for data in datasets["projects"][index]["datasets"] if data != deleted_dataset]
+
+                    #Save the updated database
                     with open('datasets.json', 'w') as file:
                         json.dump(datasets, file, indent=4)
                     return True
             return False
-
-# @mutation.field("deleteConfig")
-# async def resolve_deleteConfig(_,info,name,datasetName, project="Default"):
-#     for ind,file in enumerate(datasets["configs"]):
-#         if (file["name"]==name):
-#             url=file["rawData"]
-#             bucket_name = url.split("//")[1].split(".")[0]
-#             file_key = url.split("//")[1].split("/", 1)[1]
-#             s3.delete_object(Bucket=bucket_name, Key=file_key)
-#             url=file["clusteredData"]
-#             bucket_name = url.split("//")[1].split(".")[0]
-#             file_key = url.split("//")[1].split("/", 1)[1]
-#             s3.delete_object(Bucket=bucket_name, Key=file_key)
-#             url=file["clustersFractions"]
-#             bucket_name = url.split("//")[1].split(".")[0]
-#             file_key = url.split("//")[1].split("/", 1)[1]
-#             s3.delete_object(Bucket=bucket_name, Key=file_key)
-#             url=file["clusteredDataset"]
-#             bucket_name = url.split("//")[1].split(".")[0]
-#             file_key = url.split("//")[1].split("/", 1)[1]
-#             s3.delete_object(Bucket=bucket_name, Key=file_key)
-#             del datasets["configs"][ind]
-#             with open('datasets.json', 'w') as file:
-#                 json.dump(datasets, file, indent=4)
-#             return True
-#     return False
 
 @mutation.field("deleteConfig")
 async def resolve_deleteConfig(_,info,name,datasetName, project):
@@ -646,10 +622,10 @@ async def resolve_kmedoids_cluster(_, info, num_clusters, init, random_state, da
     
     # file_name=download_from_s3(url,'../temp_dataset/')
     file_name=getDatasetURL(dataset_name,project)
-    response = await cluster_helper(
+    response, scores = await cluster_helper(
         StringDefinitionsHelper.K_MEDOIDS_LABEL, clustering_details, file_name, cluster_data_on
     )
-    return populate_response_with_image_url(response)
+    return populate_response_with_image_url(response), scores
 
 
 optics = ObjectType(StringDefinitionsHelper.OPTICS_LABEL)
@@ -657,7 +633,7 @@ optics = ObjectType(StringDefinitionsHelper.OPTICS_LABEL)
 
 @optics.field("cluster")
 @convert_kwargs_to_snake_case
-async def resolve_optics_cluster(_, info, max_eps, min_samples, algorithm, dataset_name, cluster_data_on,project):
+async def resolve_optics_cluster(_, info, max_eps, min_samples, algorithm, dataset_name, cluster_data_on, project):
     """
     Resolves the cluster query for optics clustering
     :param _: unused parameter
@@ -675,10 +651,10 @@ async def resolve_optics_cluster(_, info, max_eps, min_samples, algorithm, datas
     
     # file_name=download_from_s3(url,'../temp_dataset/')
     file_name=getDatasetURL(dataset_name,project)
-    response = await cluster_helper(
+    response, scores = await cluster_helper(
         StringDefinitionsHelper.OPTICS_LABEL, clustering_details, file_name, cluster_data_on
     )
-    return populate_response_with_image_url(response)
+    return populate_response_with_image_url(response), scores
 
 
 
@@ -731,10 +707,10 @@ async def resolve_gaussianmixturemodel_cluster(_, info, num_clusters,dataset_nam
     
     # file_name=download_from_s3(url,'../temp_dataset/')
     file_name=getDatasetURL(dataset_name,project)
-    response = await cluster_helper(
+    response, scores = await cluster_helper(
         "gaussianmixturemodel", clustering_details, file_name, cluster_data_on
     )
-    return populate_response_with_image_url(response)
+    return populate_response_with_image_url(response), scores
 
 spectral = ObjectType(StringDefinitionsHelper.SPECTRAL_LABEL)
 

@@ -68,7 +68,6 @@ async def execute(clustering_method, clustering_details, file_name, file_format,
     print("PreProcessing Data... ")
     data_df, x_df, y_df = PreProcessingHelper.preprocess_data(data_df=data_df, x_df=x_df, y_df=y_df,remove_outliers=remove_outliers)
 
-    print("data_df: ", data_df)
     print("Done PreProcessing Data")
     # Cluster the data
     for queue in queues:
@@ -80,7 +79,6 @@ async def execute(clustering_method, clustering_details, file_name, file_format,
                                                          clustering_details=clustering_details,
                                                          label=clustered_column)
     
-    print("clustered_data: ", clustered_data)
     print("Done Clustering Data")
     # Provide Analysis
     for queue in queues:

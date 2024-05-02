@@ -46,6 +46,8 @@ def perform_analysis(data_df, x_df, y_df, clustered_data, prop, show_contour_clu
     if show_contour_raw:
         plot_raw_data(data_df=data_df, x_df=x_df, y_df=y_df, prop=prop)
 
+    print("raw data plotted")
+
     if show_contour_clustered or save_clustered_contour:
         plot_clustered_data(x_df=x_df, y_df=y_df, clustered_data=clustered_data, prop=prop, cluster_name=cluster_name,
                             cluster_iter=cluster_iter, save_clustered_contour=save_clustered_contour, save_dir=save_dir,
@@ -98,7 +100,6 @@ def plot_raw_data(data_df, x_df, y_df, prop):
         z_values = np.rot90(data_df["Data"].values.reshape(grid_size_x, grid_size_y))
 
         fig, ax = plt.subplots(figsize=(6, 6))
-        fig.set_facecolor('#282828')
         ax.tick_params(axis='x', colors='#adafa2')
         ax.tick_params(axis='y', colors='#adafa2')
 
@@ -108,19 +109,19 @@ def plot_raw_data(data_df, x_df, y_df, prop):
 
         cb = fig.colorbar(cf, ax=ax)
         # Labels being set
-        cb.set_label("Raw " + str(prop) + " Values (GPA)", color='#adafa2')
-        plt.title(str(prop) + " Raw Data VS Coordinate", color='#adafa2')
-        plt.xlabel("X Values (um)", color='#adafa2')
-        plt.ylabel("Y Values (um)", color='#adafa2')
+        cb.set_label("Raw " + str(prop) + " Values (GPA)")
+        plt.title(str(prop) + " Raw Data VS Coordinate", wrap=True)
+        plt.xlabel("X Values (um)")
+        plt.ylabel("Y Values (um)")
         plt.savefig('../temp_image/raw_data.png')
         #plt.show()
         plt.close()
         return
     else:
-        z_values1 = np.rot90(data_df["Hardness"].values.reshape(grid_size_x, grid_size_y))
-        z_values2 = np.rot90(data_df["Modulus"].values.reshape(grid_size_x, grid_size_y))
 
+        columns = data_df.columns.tolist()
 
+        z_values = [np.rot90(data_df[column].values.reshape(grid_size_x, grid_size_y)) for column in columns]
 
         # Create a figure and axis object
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -130,28 +131,20 @@ def plot_raw_data(data_df, x_df, y_df, prop):
         # Set the aspect ratio of the plot
         ax.set_aspect('equal')
 
-        # Plot the contour plot for the first value (Hardness)
-        cf1 = ax.contourf(x_values, y_values, z_values1, num_clusters - 1)
+        for index in range(len(columns)):
+            cf = ax.contourf(x_values, y_values, z_values[index], num_clusters - 1)
+            cb = fig.colorbar(cf, ax=ax)
+            cb.set_label(f"Raw {columns[index]} Values (GPA)")
 
-        # Add a colorbar to the plot
-        cb1 = fig.colorbar(cf1, ax=ax)
-        cb1.set_label("Raw Hardness Values (GPA)")
-
-        # Plot the contour plot for the second value (Modulus)
-        cf2 = ax.contourf(x_values, y_values, z_values2, num_clusters - 1)
-
-        # Add a colorbar to the plot
-        cb2 = fig.colorbar(cf2, ax=ax)
-        cb2.set_label("Raw Modulus Values (GPA)")
+        plt.tight_layout()
 
         # Set the title and axis labels for the plot
-        plt.title("Hardness and Modulus Raw Data VS Coordinate")
-        plt.xlabel("X Values (um)", color='#adafa2')
-        plt.ylabel("Y Values (um)", color='#adafa2')
+        plt.title("Raw Data VS Coordinate")
+        plt.xlabel("X Values (um)")
+        plt.ylabel("Y Values (um)")
 
         # Save the plot to a file and display it
         plt.savefig('../temp_image/raw_data.png')
-        #plt.show()
         plt.close()
         return
 
@@ -185,7 +178,6 @@ def plot_clustered_data(x_df, y_df, clustered_data, prop, cluster_name, cluster_
     z_values = np.rot90(clustered_data["Data"].values.reshape(grid_size_x, grid_size_y))
 
     fig, ax = plt.subplots(figsize=(6, 6))
-    fig.set_facecolor('#282828')
 
     ax.set_aspect('equal')
     # Plots contour plot
@@ -196,9 +188,9 @@ def plot_clustered_data(x_df, y_df, clustered_data, prop, cluster_name, cluster_
     cb = fig.colorbar(cf, ax=ax)
     # Labels being set
     cb.set_label("Phase")
-    plt.title(str(prop) + " Clustered VS X, Y", color='#adafa2' )
-    plt.xlabel("X Values (um)", color='#adafa2')
-    plt.ylabel("Y Values (um)", color='#adafa2')
+    plt.title(str(prop) + " Clustered VS X, Y")
+    plt.xlabel("X Values (um)")
+    plt.ylabel("Y Values (um)")
 
     if save_clustered_contour:
         plt.savefig(clusters_save_dir + "/clustered_data_" + str(cluster_iter) + "_" + str(cluster_name))
@@ -238,28 +230,26 @@ def plot_clusters_fractions(cluster_results, prop, show_bar=False, save_cluster_
     cluster_fractions = []
     cluster_num = []
     unique_cluster_values = np.unique(cluster_results)
+
     for i in unique_cluster_values:
         fraction = float(res_list.count(i)) / float(len(res_list))
         cluster_fractions.append(fraction)
-        cluster_num.append(i + 1)
-    plt.figure(figsize=(6, 6)).set_facecolor('#282828')
+        cluster_num.append(int(i))
+    plt.figure(figsize=(6, 6))
     plt.bar(cluster_num, height=cluster_fractions, width=0.4)
 
     # TODO I would like to revisit how we are making this bar graph, I don't like the width being a set amount
     # TODO I would also like to see if it is possible to make the bar graph only use integer values for it's x values
 
-    plt.title("Distribution of " + str(prop) + " Data After Clustering into " + str(len(cluster_num)) + " Clusters", color='#adafa2')
-    plt.xlabel("Cluster (" + str(len(cluster_num)) + " Clusters)", color='#adafa2')
-    plt.ylabel("Percentage of Data Contained Within Cluster", color='#adafa2')
+    plt.title("Distribution of " + str(prop) + " Data After Clustering into " + str(len(cluster_num)) + " Clusters", wrap=True)
+    plt.xlabel("Cluster (" + str(len(cluster_num)) + " Clusters)")
+    plt.ylabel("Percentage of Data Contained Within Cluster")
 
     if save_cluster_histograms:
         plt.savefig(cluster_histogram_dir + "/clustered_data_" + str(cluster_iter) + "_" + str(cluster_name))
-        # print(
-        #     "----------------------------------------------------------------------------------------------------------------------------------------------------------")
 
     if show_bar:
         plt.savefig('../temp_image/clusters_fractions.png')
-        #plt.show()
         plt.close()
     else:
         plt.close()
@@ -356,7 +346,7 @@ def save_data(data_df,x_df, y_df,clustered_data, clustered_data_dir,prop, cluste
         df_concat = df_concat.drop(df_concat.index[-2:], axis=0)
         df_concat.to_excel(file_path, float_format="%.2f")
     else:
-        df_concat = pd.concat([x_df['Data'], y_df['Data'], data_df[['Hardness', 'Modulus']].astype(str).agg(','.join, axis=1), clustered_data['Data']], axis=1)
+        df_concat = pd.concat([x_df['Data'], y_df['Data'], data_df.astype(str).agg(','.join, axis=1), clustered_data['Data']], axis=1)
         df_concat.columns = ['x', 'y', 'label', 'cluster']
         df_concat = df_concat.iloc[:-2] # remove last two rows
         df_concat.to_excel(file_path, float_format="%.2f")

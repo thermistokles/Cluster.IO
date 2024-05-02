@@ -238,8 +238,6 @@ class ExcelFileReaderHelper:
 
         """
 
-        print("clustered_columns: ", clustered_columns)
-
         return self.read_next_sheet(clustered_columns, skip_first_row=True, use_cols="A:I", hard_col_name="HARDNESS",
                                     mod_col_name="MODULUS", x_col_name="X Position", y_col_name="Y Position",
                                     get_stiffness=get_stiffness, stif_col_name="Stiffness", nulls=nulls)

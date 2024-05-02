@@ -116,7 +116,7 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
         num_clusters = int(clustering_details[StringDefinitionsHelper.NUM_CLUSTERS_LABEL])
         init = clustering_details[StringDefinitionsHelper.INIT_LABEL]
         random_state = int(clustering_details[StringDefinitionsHelper.RANDOM_STATE_LABEL])
-        clustered_df = perform_k_medoids(data_df=altered_df, num_clusters=num_clusters, init=init,
+        clustered_df, scores = perform_k_medoids(data_df=altered_df, num_clusters=num_clusters, init=init,
                                          random_state=random_state)
 
     elif clustering_method == StringDefinitionsHelper.OPTICS_LABEL:
@@ -124,7 +124,7 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
         max_eps = float(clustering_details["max_eps"])
         min_samples = int(clustering_details[StringDefinitionsHelper.MIN_SAMPLES_LABEL])
         algorithm = clustering_details[StringDefinitionsHelper.ALGORITHM_LABEL]
-        clustered_df = perform_optics(data_df=altered_df, max_eps=max_eps, min_samples=min_samples, algorithm=algorithm)
+        clustered_df, scores = perform_optics(data_df=altered_df, max_eps=max_eps, min_samples=min_samples, algorithm=algorithm)
     
     elif clustering_method == "fuzzycmeans":
         # Fuzzy C Means Clustering
@@ -134,7 +134,7 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
 
     elif clustering_method == "gaussianmixturemodel":
         num_clusters = int(clustering_details["num_clusters"])
-        clustered_df = perform_gaussianmixturemodel(data_df=altered_df, num_clusters=num_clusters)
+        clustered_df, scores = perform_gaussianmixturemodel(data_df=altered_df, num_clusters=num_clusters)
 
     elif clustering_method == StringDefinitionsHelper.SPECTRAL_LABEL:
         # Spectral Clustering
@@ -186,10 +186,6 @@ def perform_clustering(data_df, clustering_details=DEFAULT_DETAILS, clustering_m
 
     # Get new DataFrame with ordered clusters
     new_df = order_clusters(data_df=data_df, clustered_data_df=clustered_df)
-
-    print("new_df: ", new_df)
-
-    print("scores: ", scores)
 
     return new_df, scores
 
@@ -336,12 +332,6 @@ def perform_k_means(data_df, num_clusters=3, random_state=0):
     
     k_means_results = k_means.predict(data_df)
 
-    print("k_means_results: ", k_means_results)
-
-    # silhouette = silhouette_score(data_df, k_means_results)
-    # davies_bouldin = davies_bouldin_score(data_df, k_means_results)
-    # calinski_harabasz = calinski_harabasz_score(data_df, k_means_results)
-
     scores = calculate_score(data_df=data_df, results=k_means_results)
 
     return transform_to_df(k_means_results), scores
@@ -371,7 +361,9 @@ def perform_k_medoids(data_df, num_clusters=3, init="random", random_state=0):
     k_medoids = KMedoids(n_clusters=num_clusters, init=init, random_state=random_state).fit(data_df)
 
     k_medoids_results = k_medoids.labels_
-    return transform_to_df(k_medoids_results)
+    scores = calculate_score(data_df=data_df, results=k_medoids_results)
+
+    return transform_to_df(k_medoids_results), scores
 
 
 def perform_optics(data_df, max_eps=0.09, min_samples=100, algorithm="auto"):
@@ -393,7 +385,9 @@ def perform_optics(data_df, max_eps=0.09, min_samples=100, algorithm="auto"):
 
     optics = OPTICS(algorithm=algorithm, max_eps=max_eps, min_samples=min_samples).fit(data_df)
     optics_results = optics.labels_
-    return transform_to_df(optics_results)
+    scores = calculate_score(data_df=data_df, results=optics_results)
+
+    return transform_to_df(optics_results), scores
 
 def perform_fuzzycmeans(data_df, num_clusters=3, Fuzzifier=2):
     """
@@ -434,7 +428,9 @@ def perform_gaussianmixturemodel(data_df, num_clusters=3):
     """
     gmm= GaussianMixture(n_components= num_clusters).fit(data_df)
     gmm_results = gmm.predict(data_df)
-    return transform_to_df(gmm_results)
+    scores = calculate_score(data_df=data_df, results=gmm_results)
+
+    return transform_to_df(gmm_results), scores
 
 
 def perform_spectral(data_df, num_clusters=3, assign_labels="discretize", affinity="rbf", random_state=0):
@@ -521,8 +517,12 @@ def order_clusters(data_df, clustered_data_df):
     # Transform the data into a single DataFrame
     if "Data" in data_df.columns :
         original_data_values = pd.DataFrame({"Data": data_df["Data"].values, "Cluster": clustered_data_df["Data"].values})
+
     else:
-        original_data_values =  pd.DataFrame({"Hardness": data_df["Hardness"].values,"Modulus": data_df["Modulus"].values, "Cluster": clustered_data_df["Data"].values})
+        original_data_values = pd.concat([data_df, clustered_data_df["Data"]], axis=1)
+
+        original_data_values.rename(columns={'Data': 'Cluster'}, inplace=True)
+
     # Find the unique values to find the number of clusters we are altering
     unique_values = np.unique(original_data_values["Cluster"].values)
     num_clusters = len(unique_values) - int(-1 in unique_values)
@@ -531,7 +531,9 @@ def order_clusters(data_df, clustered_data_df):
     if "Data" in data_df.columns :
         cluster_representations = original_data_values.groupby("Cluster")["Data"].min().reset_index().sort_values("Data")
     else :
-        cluster_representations = original_data_values.groupby("Cluster")[["Hardness", "Modulus"]].min().reset_index().sort_values(["Hardness", "Modulus"])
+        columns_list = [col for col in original_data_values.columns if col != 'Cluster']
+        cluster_representations = original_data_values.groupby(columns_list).min().reset_index().reset_index().sort_values(columns_list)
+
     # Map the old cluster values to the new cluster values
     transformation_dictionary = {cluster_value: i for i, cluster_value in enumerate(cluster_representations["Cluster"])}
 
@@ -540,8 +542,17 @@ def order_clusters(data_df, clustered_data_df):
 
     return df_new
 
-#Function to calculate scores
 def calculate_score(data_df, results):
+    """
+
+    :param data_df: A DataFrame representation of all of the raw data we are reading
+    :param results: A DataFrame representation of all of the clustered data we are reading
+
+    :return: An array containing scores
+
+    Returns the silhouette, Davis Bouldin and Calinski Harabasz scores after clustering
+
+    """
     silhouette = silhouette_score(data_df, results)
     davies_bouldin = davies_bouldin_score(data_df, results)
     calinski_harabasz = calinski_harabasz_score(data_df, results)
